@@ -5,26 +5,32 @@ import (
 
 	"github.com/openshift/elasticsearch-proxy/pkg/apis/security"
 	"github.com/openshift/elasticsearch-proxy/pkg/clients"
+	"github.com/openshift/elasticsearch-proxy/pkg/config"
 	cl "github.com/openshift/elasticsearch-proxy/pkg/handlers/clusterlogging/types"
 	log "github.com/sirupsen/logrus"
 )
 
 //DocumentManager understands how to load and sync ACL documents
 type DocumentManager struct {
-	cl.ExtConfig
+	config.Options
 	securityClient clients.SecurityClient
+	fnSleeper      func(time.Duration)
 }
 
 //NewDocumentManager creates an instance or returns error
-func NewDocumentManager(config cl.ExtConfig) (*DocumentManager, error) {
+func NewDocumentManager(config config.Options) (*DocumentManager, error) {
 	log.Tracef("Instantiating a new document manager using: %+v", config)
-	sgClient, err := clients.NewESSecurityClient(config.Options)
+	sgClient, err := clients.NewESSecurityClient(config)
 	if err != nil {
 		return nil, err
+	}
+	sleeper := func(t time.Duration) {
+		time.Sleep(t)
 	}
 	return &DocumentManager{
 		config,
 		sgClient,
+		sleeper,
 	}, nil
 }
 
@@ -41,7 +47,7 @@ func (dm *DocumentManager) SyncACL(userInfo *cl.UserInfo) {
 	for delay := range []int{1, 1, 2, 3, 5, 8} {
 		if !dm.trySyncACL(userInfo) {
 			log.Debugf("Unable to synce ACLs, sleeping for %q seconds...", delay)
-			time.Sleep(time.Duration(delay) * time.Second)
+			dm.fnSleeper(time.Duration(delay) * time.Second)
 		}
 	}
 }

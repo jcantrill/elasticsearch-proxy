@@ -15,7 +15,7 @@ import (
 	"golang.org/x/net/http2"
 
 	configOptions "github.com/openshift/elasticsearch-proxy/pkg/config"
-	extensions "github.com/openshift/elasticsearch-proxy/pkg/handlers"
+	handlers "github.com/openshift/elasticsearch-proxy/pkg/handlers"
 	"github.com/openshift/elasticsearch-proxy/pkg/util"
 	"github.com/yhat/wsutil"
 )
@@ -23,12 +23,12 @@ import (
 type ProxyServer struct {
 	serveMux http.Handler
 
-	//extensions
-	requestHandlers []extensions.RequestHandler
+	//handlers
+	requestHandlers []handlers.RequestHandler
 }
 
 //RegisterRequestHandlers adds request handlers to the
-func (p *ProxyServer) RegisterRequestHandlers(reqHandlers []extensions.RequestHandler) {
+func (p *ProxyServer) RegisterRequestHandlers(reqHandlers []handlers.RequestHandler) {
 	p.requestHandlers = append(p.requestHandlers, reqHandlers...)
 }
 
@@ -118,17 +118,16 @@ func NewWebSocketOrRestReverseProxy(u *url.URL, opts *configOptions.Options) (re
 
 func NewProxyServer(opts *configOptions.Options) *ProxyServer {
 	serveMux := http.NewServeMux()
-	for _, u := range opts.ProxyURLs {
-		path := u.Path
-		switch u.Scheme {
-		case "http", "https":
-			log.Printf("mapping path %q => upstream %q", path, u)
-			proxy := NewWebSocketOrRestReverseProxy(u, opts)
-			serveMux.Handle(path, proxy)
+	u := opts.ElasticsearchURL
+	path := u.Path
+	switch u.Scheme {
+	case "http", "https":
+		log.Printf("mapping path %q => upstream %q", path, u)
+		proxy := NewWebSocketOrRestReverseProxy(u, opts)
+		serveMux.Handle(path, proxy)
 
-		default:
-			panic(fmt.Sprintf("unknown upstream protocol %s", u.Scheme))
-		}
+	default:
+		panic(fmt.Sprintf("unknown upstream protocol %s", u.Scheme))
 	}
 
 	return &ProxyServer{
@@ -140,7 +139,7 @@ func (p *ProxyServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	log.Printf("Serving request: %s", req.URL.Path)
 	var err error
 	alteredReq := req
-	context := extensions.RequestContext{}
+	context := handlers.RequestContext{}
 	for _, reqhandler := range p.requestHandlers {
 		alteredReq, err = reqhandler.Process(alteredReq, &context)
 		log.Printf("Handling request %q", reqhandler.Name())
@@ -156,7 +155,7 @@ func (p *ProxyServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (p *ProxyServer) StructuredError(rw http.ResponseWriter, err error) {
-	structuredError := extensions.NewStructuredError(err)
+	structuredError := handlers.NewStructuredError(err)
 	log.Printf("Error %d %s %s", structuredError.Code, structuredError.Message, structuredError.Error)
 	rw.Header().Set("Content-Type", "application/json")
 	rw.WriteHeader(structuredError.Code)
