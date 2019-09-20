@@ -23,6 +23,8 @@ const (
 	DocTypeRolesmapping DocType = "rolesmapping"
 )
 
+var epoch = time.Unix(0, 0)
+
 //ACLDocuments are the security documents
 type ACLDocuments map[DocType]ACLDocument
 
@@ -93,11 +95,11 @@ func (docs *ACLDocuments) AddUser(user *cl.UserInfo, expires int64) {
 //ExpirePermissions which are older then now
 func (docs *ACLDocuments) ExpirePermissions() {
 	log.Debug("Expiring permissions...")
-	now := time.Now().UnixNano() / int64(time.Millisecond)
+	now := time.Now()
 	for docType, aclDoc := range *docs {
 		for name, entry := range aclDoc.Iterate() {
-			expire := entry.GetExpiresInMillis()
-			if expire > 0 && expire < now {
+			expire := time.Unix(0, entry.GetExpiresInMillis())
+			if expire.After(epoch) && expire.Before(now) {
 				log.Tracef("Expiring %s: %s", docType, name)
 				aclDoc.Remove(name)
 			}

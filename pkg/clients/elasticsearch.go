@@ -54,11 +54,16 @@ type DefaultElasticsearchClient struct {
 
 //NewElasticsearchClient is the initializer to create an instance of ES client
 func NewElasticsearchClient(skipVerify bool, serverURL, adminCert, adminKey string, adminCA []string) (ElasticsearchClient, error) {
-	caCertPool := x509.NewCertPool()
+	caCertPool, err := x509.SystemCertPool()
+	if err != nil {
+		log.Fatal(err)
+		return nil, err
+	}
 	for _, ca := range adminCA {
 		caCert, err := ioutil.ReadFile(ca)
 		if err != nil {
 			log.Fatal(err)
+			return nil, err
 		}
 		caCertPool.AppendCertsFromPEM(caCert)
 	}
@@ -66,6 +71,7 @@ func NewElasticsearchClient(skipVerify bool, serverURL, adminCert, adminKey stri
 	cert, err := tls.LoadX509KeyPair(adminCert, adminKey)
 	if err != nil {
 		log.Fatal(err)
+		return nil, err
 	}
 
 	client := &http.Client{
