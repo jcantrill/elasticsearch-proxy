@@ -124,47 +124,47 @@ var _ = Describe("SecurityClient", func() {
 				Expect(docs.RolesMapping().Version()).To(Equal(rolesmappingVersion))
 			})
 		})
+	})
 
-		Describe("#FlushACL", func() {
+	Describe("#FlushACL", func() {
+		BeforeEach(func() {
+			roles := security.NewRoles()
+			roles.DocVersion = rolesVersion
+			rolesmapping := security.NewRolesMapping()
+			rolesmapping.DocVersion = rolesmappingVersion
+			docs = &security.ACLDocuments{
+				security.DocTypeRoles:        roles,
+				security.DocTypeRolesmapping: rolesmapping,
+			}
+		})
+		Describe("when error writing documents", func() {
+			It("should return the error", func() {
+				fakeClient.err = fmt.Errorf("fake error%s", "")
+				err = sc.FlushACL(*docs)
+				Expect(err).To(HaveOccurred())
+			})
+		})
+		Describe("when error invalidating cache", func() {
+			It("should return the error", func() {
+				fakeClient.deleteErr = fmt.Errorf("fake error%s", "")
+				err = sc.FlushACL(*docs)
+				Expect(err).To(HaveOccurred())
+			})
+		})
+		Describe("when successful", func() {
 			BeforeEach(func() {
-				roles := security.NewRoles()
-				roles.DocVersion = rolesVersion
-				rolesmapping := security.NewRolesMapping()
-				rolesmapping.DocVersion = rolesmappingVersion
-				docs = &security.ACLDocuments{
-					security.DocTypeRoles:        roles,
-					security.DocTypeRolesmapping: rolesmapping,
-				}
+				delete(map[security.DocType]security.ACLDocument(*docs), security.DocTypeRoles)
+				err = sc.FlushACL(*docs)
 			})
-			Describe("when error writing documents", func() {
-				It("should return the error", func() {
-					fakeClient.err = fmt.Errorf("fake error%s", "")
-					err = sc.FlushACL(*docs)
-					Expect(err).To(HaveOccurred())
-				})
+			It("should not return an error", func() {
+				Expect(err).NotTo(HaveOccurred())
 			})
-			Describe("when error invalidating cache", func() {
-				It("should return the error", func() {
-					fakeClient.deleteErr = fmt.Errorf("fake error%s", "")
-					err = sc.FlushACL(*docs)
-					Expect(err).To(HaveOccurred())
-				})
-			})
-			Describe("when successful", func() {
-				BeforeEach(func() {
-					delete(map[security.DocType]security.ACLDocument(*docs), security.DocTypeRoles)
-					err = sc.FlushACL(*docs)
-				})
-				It("should not return an error", func() {
-					Expect(err).NotTo(HaveOccurred())
-				})
-				It("should include the document versions", func() {
-					act := &map[string]interface{}{}
-					err = json.Unmarshal([]byte(fakeClient.payload), act)
-					Expect(err).NotTo(HaveOccurred())
-					Expect(*act).Should(HaveKey("rolesmapping"))
-					Expect(fakeClient.requestPath).Should(HaveSuffix(fmt.Sprintf("?version=%v", rolesmappingVersion)))
-				})
+			It("should include the document versions", func() {
+				act := &map[string]interface{}{}
+				err = json.Unmarshal([]byte(fakeClient.payload), act)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(*act).Should(HaveKey("rolesmapping"))
+				Expect(fakeClient.requestPath).Should(HaveSuffix(fmt.Sprintf("?version=%v", rolesmappingVersion)))
 			})
 		})
 	})
