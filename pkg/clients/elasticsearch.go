@@ -6,10 +6,14 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/bitly/go-simplejson"
+	es "github.com/elastic/go-elasticsearch/v6"
+	"github.com/elastic/go-elasticsearch/v6/esapi"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -39,17 +43,16 @@ type MGetResponseItem struct {
 
 //ElasticsearchClient is an admin client to query a local instance of Elasticsearch
 type ElasticsearchClient interface {
-	Get(path string) (string, error)
+	Get(index, docType, id string) (string, error)
+	Index(index, docType, id, body string, version int) (string, error)
 	MGet(index string, items MGetRequest) (*MGetResponse, error)
-	Delete(path string) (string, error)
-	Put(path string, body string) (string, error)
-	Post(path string, body string) (string, error)
+	Delete(index, docType, id string) (string, error)
 }
 
 //DefaultElasticsearchClient is an admin client to query a local instance of Elasticsearch
 type DefaultElasticsearchClient struct {
 	serverURL string
-	client    *http.Client
+	client    *es.Client
 }
 
 //NewElasticsearchClient is the initializer to create an instance of ES client
@@ -74,8 +77,14 @@ func NewElasticsearchClient(skipVerify bool, serverURL, adminCert, adminKey stri
 		return nil, err
 	}
 
-	client := &http.Client{
+	cfg := es.Config{
+		Addresses: []string{
+			serverURL,
+		},
 		Transport: &http.Transport{
+			MaxIdleConnsPerHost:   10,
+			ResponseHeaderTimeout: time.Second,
+			DialContext:           (&net.Dialer{Timeout: time.Second}).DialContext,
 			TLSClientConfig: &tls.Config{
 				RootCAs:            caCertPool,
 				Certificates:       []tls.Certificate{cert},
@@ -83,6 +92,13 @@ func NewElasticsearchClient(skipVerify bool, serverURL, adminCert, adminKey stri
 			},
 		},
 	}
+
+	client, err := es.NewClient(cfg)
+	if err != nil {
+		log.Fatal(err)
+		return nil, err
+	}
+
 	return &DefaultElasticsearchClient{serverURL, client}, nil
 }
 
@@ -101,15 +117,9 @@ func (es *DefaultElasticsearchClient) MGet(index string, items MGetRequest) (*MG
 	if out, err = json.Marshal(items); err != nil {
 		return nil, err
 	}
-	request, err := http.NewRequest("GET", url(es.serverURL, index+"/_mget"), bytes.NewReader(out))
+	resp, err := es.client.Mget(bytes.NewReader(out), es.client.Mget.WithIndex(index))
 	if err != nil {
-		log.Tracef("Error executing Elasticsearch GET %v", err)
-		return nil, err
-	}
-	request.Header.Set("Content-Type", contentTypeJSON)
-	var resp *http.Response
-	resp, err = es.client.Do(request)
-	if err != nil {
+		log.Tracef("Error executing Elasticsearch MGet %v", err)
 		return nil, err
 	}
 	bodyAsString, err := readBody(resp)
@@ -125,11 +135,10 @@ func (es *DefaultElasticsearchClient) MGet(index string, items MGetRequest) (*MG
 	return mgetResponse, nil
 }
 
-//Get the content at the path
-func (es *DefaultElasticsearchClient) Get(path string) (string, error) {
-	url := url(es.serverURL, path)
-	log.Tracef("Get: %v", url)
-	resp, err := es.client.Get(url)
+//Get the Document
+func (es *DefaultElasticsearchClient) Get(index, docType, id string) (string, error) {
+	log.Tracef("Get: %s, %s, %s", index, docType, id)
+	resp, err := es.client.Get(index, id, es.client.Get.WithDocumentType(docType))
 	if err != nil {
 		log.Tracef("Error executing Elasticsearch GET %v", err)
 		return "", err
@@ -142,7 +151,7 @@ func (es *DefaultElasticsearchClient) Get(path string) (string, error) {
 	return body, nil
 }
 
-func readBody(resp *http.Response) (string, error) {
+func readBody(resp *esapi.Response) (string, error) {
 	defer resp.Body.Close()
 	body, err := simplejson.NewFromReader(resp.Body)
 	if err != nil {
@@ -162,42 +171,29 @@ func readBody(resp *http.Response) (string, error) {
 	return string(result), nil
 }
 
-//Put submits a PUT request to ES assuming the given body is of type 'application/json'
-func (es *DefaultElasticsearchClient) Put(path string, body string) (string, error) {
-	request, err := http.NewRequest("PUT", url(es.serverURL, path), strings.NewReader(body))
+//Index submits an index request to ES
+func (es *DefaultElasticsearchClient) Index(index, docType, id, body string, version int) (string, error) {
+	resp, err := es.client.Index(index, strings.NewReader(body),
+		es.client.Index.WithDocumentType(docType),
+		es.client.Index.WithDocumentID(id),
+		es.client.Index.WithVersion(version))
 	if err != nil {
 		log.Tracef("Error executing Elasticsearch PUT %v", err)
 		return "", err
 	}
-	request.Header.Set("Content-Type", contentTypeJSON)
-	var resp *http.Response
-	resp, err = es.client.Do(request)
 	if err != nil {
-		return "", err
-	}
-	return readBody(resp)
-}
-
-//Post submits a Post request to ES assuming the given body is of type 'application/json'
-func (es *DefaultElasticsearchClient) Post(path string, body string) (string, error) {
-	resp, err := http.Post(url(es.serverURL, path), contentTypeJSON, strings.NewReader(body))
-	if err != nil {
-		log.Tracef("Error executing Elasticsearch POST %v", err)
 		return "", err
 	}
 	return readBody(resp)
 }
 
 //Delete submits a Delete request to ES assuming the given body is of type 'application/json'
-func (es *DefaultElasticsearchClient) Delete(path string) (string, error) {
-	request, err := http.NewRequest("DELETE", url(es.serverURL, path), nil)
+func (es *DefaultElasticsearchClient) Delete(index, docType, id string) (string, error) {
+	resp, err := es.client.Delete(index, id, es.client.Delete.WithDocumentType(docType))
 	if err != nil {
 		log.Tracef("Error executing Elasticsearch DELETE %v", err)
 		return "", err
 	}
-	request.Header.Set("Content-Type", contentTypeJSON)
-	var resp *http.Response
-	resp, err = es.client.Do(request)
 	if err != nil {
 		return "", err
 	}

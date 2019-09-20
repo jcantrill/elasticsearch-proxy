@@ -182,15 +182,14 @@ func (sg *DefaultESSecurityClient) FlushACL(docs security.ACLDocuments) error {
 		if err != nil {
 			return err
 		}
-		path := fmt.Sprintf("/.security/security/%s?version=%d", doc.Type(), doc.Version())
-		if _, err = sg.esClient.Put(path, sDoc); err != nil {
+		if _, err = sg.esClient.Index(".security", "security", string(doc.Type()), sDoc, doc.Version()); err != nil {
 			return err
 		}
 	}
 	log.Trace("Calling config reload...")
 	var resp string
 	var err error
-	if resp, err = sg.esClient.Delete("/_opendistro/_security/api/cache"); err != nil {
+	if resp, err = sg.esClient.Delete("_opendistro", "_security", "api/cache"); err != nil {
 		return err
 	}
 	log.Tracef("Config reload response %v", resp)

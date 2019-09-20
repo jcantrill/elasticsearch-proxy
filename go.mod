@@ -3,9 +3,10 @@ module github.com/openshift/elasticsearch-proxy
 go 1.12
 
 require (
-	github.com/BurntSushi/toml v0.3.1
+	github.com/BurntSushi/toml v0.3.1 // indirect
 	github.com/bitly/go-simplejson v0.5.0
 	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869
+	github.com/elastic/go-elasticsearch/v6 v6.8.3-0.20190910075047-589da7b96681
 	github.com/golang/protobuf v1.3.1 // indirect
 	github.com/keegancsmith/rpc v1.1.0 // indirect
 	github.com/kr/pretty v0.1.0 // indirect

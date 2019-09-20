@@ -3,6 +3,7 @@ package clients
 import (
 	"encoding/json"
 	"fmt"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -28,7 +29,7 @@ type elasticsearchClientFake struct {
 	requestPath  string
 }
 
-func (es *elasticsearchClientFake) Get(path string) (string, error) {
+func (es *elasticsearchClientFake) Get(index, docType, id string) (string, error) {
 	if es.err != nil {
 		return "", es.err
 	}
@@ -40,24 +41,18 @@ func (es *elasticsearchClientFake) MGet(index string, items MGetRequest) (*MGetR
 	}
 	return es.mgetResponse, nil
 }
-func (es *elasticsearchClientFake) Delete(path string) (string, error) {
+func (es *elasticsearchClientFake) Delete(index, docType, id string) (string, error) {
 	if es.deleteErr != nil {
 		return "", es.deleteErr
 	}
 	return es.response, nil
 }
-func (es *elasticsearchClientFake) Put(path string, body string) (string, error) {
+func (es *elasticsearchClientFake) Index(index, docType, id, body string, version int) (string, error) {
 	if es.err != nil {
 		return "", es.err
 	}
 	es.payload = body
-	es.requestPath = path
-	return es.response, nil
-}
-func (es *elasticsearchClientFake) Post(path string, body string) (string, error) {
-	if es.err != nil {
-		return "", es.err
-	}
+	es.requestPath = fmt.Sprintf("%s/%s/%s?version=%d", index, docType, id, version)
 	return es.response, nil
 }
 

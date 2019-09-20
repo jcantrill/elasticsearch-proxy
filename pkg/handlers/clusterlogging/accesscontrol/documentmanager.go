@@ -49,8 +49,8 @@ func (dm *DocumentManager) SyncACL(userInfo *cl.UserInfo) {
 			log.Debugf("Unable to synce ACLs, sleeping for %q seconds...", delay)
 			dm.fnSleeper(time.Duration(delay) * time.Second)
 		} else {
-            break
-        }
+			break
+		}
 	}
 }
 
