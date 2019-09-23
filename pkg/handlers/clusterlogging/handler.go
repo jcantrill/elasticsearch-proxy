@@ -83,9 +83,9 @@ func (ext *handler) hasInfraRole(context *handlers.RequestContext) bool {
 }
 
 func newUserInfo(ext *handler, context *handlers.RequestContext) (*types.UserInfo, error) {
-	projects, err := ext.fetchProjects(context)
-	if err != nil {
-		return nil, err
+	projects := []types.Project{}
+	for _, ns := range context.Namespaces {
+		projects = append(projects, types.Project{Name: ns.Name, UUID: ns.UID})
 	}
 	info := &types.UserInfo{
 		Username: context.UserName,
@@ -96,6 +96,7 @@ func newUserInfo(ext *handler, context *handlers.RequestContext) (*types.UserInf
 	return info, nil
 }
 
+<<<<<<< Updated upstream
 func (ext *handler) fetchProjects(context *handlers.RequestContext) (projects []types.Project, err error) {
 	log.Debugf("Fetching projects for user %q", context.UserName)
 

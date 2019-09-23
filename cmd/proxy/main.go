@@ -11,7 +11,7 @@ import (
 	auth "github.com/openshift/elasticsearch-proxy/pkg/handlers/authorization"
 	cl "github.com/openshift/elasticsearch-proxy/pkg/handlers/clusterlogging"
 	"github.com/openshift/elasticsearch-proxy/pkg/proxy"
-	log "github.com/sirupsen/logrus"
+	log "github.com/openshift/elasticsearch-proxy/pkg/logging"
 )
 
 const (
@@ -19,7 +19,6 @@ const (
 )
 
 func main() {
-	initLogging()
 
 	opts, err := config.Init(os.Args[1:])
 	if err != nil {
@@ -43,19 +42,6 @@ func main() {
 		Opts:    opts,
 	}
 	s.ListenAndServe()
-}
-
-func initLogging() {
-	logLevel := os.Getenv("LOGLEVEL")
-	if logLevel == "" {
-		logLevel = "warn"
-	}
-	level, err := log.ParseLevel(logLevel)
-	if err != nil {
-		level = log.WarnLevel
-		log.Infof("Setting loglevel to 'warn' as unable to parse %s", logLevel)
-	}
-	log.SetLevel(level)
 }
 
 func readServiceAccountToken() string {

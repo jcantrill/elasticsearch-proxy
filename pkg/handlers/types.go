@@ -10,23 +10,33 @@ import (
 	"github.com/openshift/elasticsearch-proxy/pkg/config"
 )
 
+//RequestContext is info to pass between handlers
 type RequestContext struct {
-	Token    string
-	UserName string
-	Groups   []string
-	Roles    []string
+	Token      string
+	UserName   string
+	Groups     []string
+	Roles      []string
+	Namespaces []Namespace
+}
+
+//Namespace is namespace name and UID
+type Namespace struct {
+	Name string
+	UID  string
 }
 
 type Options struct {
 	*config.Options
 }
 
+//StructuredError is a JSON response of an error to be returned to the user
 type StructuredError struct {
 	Code    int    `json:"code,omitempty"`
 	Message string `json:"message,omitempty"`
 	Error   error  `json:"error,omitempty"`
 }
 
+//NewStructuredError creates an error
 func NewStructuredError(err error) StructuredError {
 	code := http.StatusInternalServerError
 	message := "Internal Error"
