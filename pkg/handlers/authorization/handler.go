@@ -25,7 +25,7 @@ type authorizationHandler struct {
 
 //NewHandlers is the initializer for this handler
 func NewHandlers(opts *config.Options) (_ []handlers.RequestHandler) {
-	osClient, err := clients.NewOpenShiftClient(*opts)
+	osClient, err := clients.NewOpenShiftClient()
 	if err != nil {
 		log.Fatalf("Error constructing OpenShiftClient %v", err)
 	}

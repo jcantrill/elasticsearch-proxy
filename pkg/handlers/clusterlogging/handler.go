@@ -3,7 +3,6 @@ package clusterlogging
 import (
 	"net/http"
 
-	"github.com/bitly/go-simplejson"
 	"github.com/openshift/elasticsearch-proxy/pkg/clients"
 	"github.com/openshift/elasticsearch-proxy/pkg/config"
 	handlers "github.com/openshift/elasticsearch-proxy/pkg/handlers"
@@ -34,7 +33,7 @@ func NewHandlers(opts *config.Options) []handlers.RequestHandler {
 	if err != nil {
 		log.Fatalf("Unable to initialize the cluster logging proxy handler %v", err)
 	}
-	client, err := clients.NewOpenShiftClient(*opts)
+	client, err := clients.NewOpenShiftClient()
 	if err != nil {
 		log.Fatalf("Unable to initialize OpenShift Client %v", err)
 	}
@@ -100,26 +99,14 @@ func newUserInfo(ext *handler, context *handlers.RequestContext) (*types.UserInf
 func (ext *handler) fetchProjects(context *handlers.RequestContext) (projects []types.Project, err error) {
 	log.Debugf("Fetching projects for user %q", context.UserName)
 
-	var json *simplejson.Json
-	json, err = ext.osClient.Get("apis/project.openshift.io/v1/projects", context.Token)
+	var namespaces []clients.Namespace
+	namespaces, err = ext.osClient.ListNamespaces(context.Token)
 	if err != nil {
 		log.Errorf("There was an error fetching projects: %v", err)
 		return nil, err
 	}
-	projects = []types.Project{}
-	if items, ok := json.CheckGet("items"); ok {
-		total := len(items.MustArray())
-		for i := 0; i < total; i++ {
-			//check for missing?
-			var name, uid string
-			if value := items.GetIndex(i).GetPath("metadata", "name"); value.Interface() != nil {
-				name = value.MustString()
-			}
-			if value := items.GetIndex(i).GetPath("metadata", "uid"); value.Interface() != nil {
-				uid = value.MustString()
-			}
-			projects = append(projects, types.Project{Name: name, UUID: uid})
-		}
+	for _, ns := range namespaces {
+		projects = append(projects, types.Project{Name: ns.Name(), UUID: ns.UID()})
 	}
 	return projects, nil
 }
